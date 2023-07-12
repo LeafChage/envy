@@ -14,6 +14,7 @@ pub fn action(path: &PathBuf, key: &str) -> Result<(), anyhow::Error> {
                 println!("{}", line.to_string());
             }
             Line::Meta(Meta::Comment(_)) => {
+                next_is_enc = false;
                 println!("{}", line.to_string());
             }
             Line::Env(ref env) => {

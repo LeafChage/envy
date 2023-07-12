@@ -14,11 +14,12 @@ pub fn action(path: &PathBuf, key: &str) -> Result<(), anyhow::Error> {
                 println!("{}", line.to_string());
             }
             Line::Meta(Meta::Comment(_)) => {
+                next_is_enc = false;
                 println!("{}", line.to_string());
             }
             Line::Env(ref env) => {
                 if next_is_enc {
-                    println!("{}", Line::Env(encrypter.decrypt(env)?).to_string());
+                    println!("{}", encrypter.decrypt(env)?.to_string());
                 } else {
                     println!("{}", line.to_string());
                 }
