@@ -6,7 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+aes-gcm = "0.10.2"
 anyhow = "1.0.71"
+base64 = "0.21.2"
 clap = { version = "4.3", features = ["derive"] }
 combine = "4.6.6"
 serde = { version = "1.0.171", features = ["derive"] }

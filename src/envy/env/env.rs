@@ -24,3 +24,9 @@ impl Env {
         (self.key.clone(), self.value.clone())
     }
 }
+
+impl ToString for Env {
+    fn to_string(&self) -> String {
+        format!("{}={}", self.key(), self.value())
+    }
+}

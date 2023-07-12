@@ -1,5 +1,5 @@
 use super::{Env, Line, Meta};
-use combine::parser::char::{digit, string, upper};
+use combine::parser::char::{digit, spaces, string, upper};
 use combine::parser::repeat::take_until;
 use combine::EasyParser;
 use combine::Stream;
@@ -7,6 +7,20 @@ use combine::{choice, eof, many, token};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+
+parser! {
+    fn comment[I]()(I) -> char
+        where [ I: Stream<Token = char> ]
+    {
+        token('#')
+    }
+}
+
+#[test]
+fn it_comment() {
+    assert_eq!(comment().easy_parse("# aaa"), Ok(('#', " aaa")));
+    assert!(comment().easy_parse("aaa").is_err());
+}
 
 parser! {
     fn key[I]()(I) -> String
@@ -24,6 +38,20 @@ parser! {
     }
 }
 
+#[test]
+fn it_key() {
+    assert_eq!(
+        key().easy_parse("KEY=VALUE"),
+        Ok((String::from("KEY"), "=VALUE"))
+    );
+    assert_eq!(
+        key().easy_parse("KEY_KEY=VALUE"),
+        Ok((String::from("KEY_KEY"), "=VALUE"))
+    );
+    assert!(key().easy_parse("key=VALUE").is_err());
+    assert!(key().easy_parse("1KEY=VALUE").is_err());
+}
+
 parser! {
     fn value[I]()(I) -> String
         where [
@@ -33,6 +61,15 @@ parser! {
         take_until::<Vec<char>, _, _>(eof())
             .map(|values| values.into_iter().fold(String::new(), |sum, next| sum + &next.to_string()))
     }
+}
+
+#[test]
+fn it_value() {
+    assert_eq!(value().easy_parse("VALUE"), Ok((String::from("VALUE"), "")));
+    assert_eq!(
+        value().easy_parse("{\"aaa: name\nbbbb\"}"),
+        Ok((String::from("{\"aaa: name\nbbbb\"}"), ""))
+    );
 }
 
 parser! {
@@ -45,16 +82,54 @@ parser! {
     }
 }
 
+#[test]
+fn it_env() {
+    assert_eq!(
+        env().easy_parse("KEY=VALUE"),
+        Ok((Env::new("KEY", "VALUE"), ""))
+    );
+}
+
+parser! {
+    fn meta_secret[I]()(I) -> Meta
+        where [
+            I: Stream<Token = char>
+        ]
+    {
+        token('%').and(string("SECRET")).map(|_| Meta::Secret)
+    }
+}
+
+parser! {
+    fn meta_comment[I]()(I) -> Meta
+        where [
+            I: Stream<Token = char>
+        ]
+    {
+        take_until(eof()).map(|v| Meta::Comment(v))
+    }
+}
+
 parser! {
     fn meta[I]()(I) -> Meta
         where [
             I: Stream<Token = char>
         ]
     {
-        token('%').and(
-            choice(( string("SECRET").map(|_| Meta::Secret),))
-            ).and(eof()).map(|((_, meta), _)| meta)
+        comment().and(choice((
+                    meta_secret(),
+                    meta_comment()
+                    ))).skip(eof()).map(|(_, meta)| meta)
     }
+}
+#[test]
+fn it_meta() {
+    assert_eq!(meta().easy_parse("#%SECRET"), Ok((Meta::Secret, "")));
+    assert!(meta().easy_parse("#%SECRET_").is_err());
+    assert_eq!(
+        meta().easy_parse("# SECRET"),
+        Ok((Meta::Comment(String::from(" SECRET")), ""))
+    );
 }
 
 parser! {
@@ -63,11 +138,28 @@ parser! {
             I: Stream<Token = char>
         ]
     {
-        choice((
-                meta().map(|v| Line::Meta(v)),
-                env().map(|v| Line::Env(v))
-               ))
+        spaces().with(choice((
+                    meta().map(|v| Line::Meta(v)),
+                    env().map(|v| Line::Env(v))
+                    )))
+
     }
+}
+
+#[test]
+fn it_line() {
+    assert_eq!(
+        line().easy_parse("KEY=VALUE"),
+        Ok((Line::Env(Env::new("KEY", "VALUE")), ""))
+    );
+    assert_eq!(
+        line().easy_parse("#%SECRET"),
+        Ok((Line::Meta(Meta::Secret), ""))
+    );
+    assert_eq!(
+        line().easy_parse("# SECRET"),
+        Ok((Line::Meta(Meta::Comment(String::from(" SECRET"))), ""))
+    );
 }
 
 pub fn parser<P: AsRef<Path>>(path: P) -> Result<Vec<Line>, anyhow::Error> {
@@ -92,53 +184,4 @@ pub fn parser_ignore_meta<P: AsRef<Path>>(path: P) -> Result<Vec<Env>, anyhow::E
         }
     }
     Ok(result)
-}
-
-#[test]
-fn it_key() {
-    assert_eq!(
-        key().easy_parse("KEY=VALUE"),
-        Ok((String::from("KEY"), "=VALUE"))
-    );
-    assert_eq!(
-        key().easy_parse("KEY_KEY=VALUE"),
-        Ok((String::from("KEY_KEY"), "=VALUE"))
-    );
-    assert!(key().easy_parse("key=VALUE").is_err());
-    assert!(key().easy_parse("1KEY=VALUE").is_err());
-}
-
-#[test]
-fn it_value() {
-    assert_eq!(value().easy_parse("VALUE"), Ok((String::from("VALUE"), "")));
-    assert_eq!(
-        value().easy_parse("{\"aaa: name\nbbbb\"}"),
-        Ok((String::from("{\"aaa: name\nbbbb\"}"), ""))
-    );
-}
-
-#[test]
-fn it_environment() {
-    assert_eq!(
-        env().easy_parse("KEY=VALUE"),
-        Ok((Env::new("KEY", "VALUE"), ""))
-    );
-}
-
-#[test]
-fn it_meta() {
-    assert_eq!(meta().easy_parse("%SECRET"), Ok((Meta::Secret, "")));
-    assert!(meta().easy_parse("%SECRET_").is_err());
-}
-
-#[test]
-fn it_line() {
-    assert_eq!(
-        line().easy_parse("KEY=VALUE"),
-        Ok((Line::Env(Env::new("KEY", "VALUE")), ""))
-    );
-    assert_eq!(
-        line().easy_parse("%SECRET"),
-        Ok((Line::Meta(Meta::Secret), ""))
-    );
 }
