@@ -14,9 +14,8 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(author, version , about, long_about=None)]
+/// envy simple env tool
 struct Cli {
-    name: Option<String>,
-
     #[command(subcommand)]
     command: Option<Commands>,
 }

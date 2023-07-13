@@ -3,7 +3,7 @@ use combine::parser::char::{digit, spaces, string, upper};
 use combine::parser::repeat::take_until;
 use combine::EasyParser;
 use combine::Stream;
-use combine::{choice, eof, many, token};
+use combine::{attempt, choice, eof, many, token};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -91,20 +91,20 @@ fn it_env() {
 }
 
 parser! {
-    fn meta_secret[I]()(I) -> Meta
-        where [
-            I: Stream<Token = char>
-        ]
+    fn meta_encrypt[I]()(I) -> Meta where [ I: Stream<Token = char> ]
     {
-        token('%').and(string("SECRET")).map(|_| Meta::Secret)
+        attempt(string("%ENCRYPT")).map(|_| Meta::Encrypt)
+    }
+}
+parser! {
+    fn meta_encrypted[I]()(I) -> Meta where [ I: Stream<Token = char> ]
+    {
+        attempt(string("%ENCRYPT")).map(|_| Meta::Encrypted)
     }
 }
 
 parser! {
-    fn meta_comment[I]()(I) -> Meta
-        where [
-            I: Stream<Token = char>
-        ]
+    fn meta_comment[I]()(I) -> Meta where [ I: Stream<Token = char> ]
     {
         take_until(eof()).map(|v| Meta::Comment(v))
     }
@@ -117,18 +117,19 @@ parser! {
         ]
     {
         comment().and(choice((
-                    meta_secret(),
+                    meta_encrypt(),
+                    meta_encrypted(),
                     meta_comment()
                     ))).skip(eof()).map(|(_, meta)| meta)
     }
 }
 #[test]
 fn it_meta() {
-    assert_eq!(meta().easy_parse("#%SECRET"), Ok((Meta::Secret, "")));
-    assert!(meta().easy_parse("#%SECRET_").is_err());
+    assert_eq!(meta().easy_parse("#%ENCRYPT"), Ok((Meta::Encrypt, "")));
+    assert!(meta().easy_parse("#%ENCRYPT_").is_err());
     assert_eq!(
-        meta().easy_parse("# SECRET"),
-        Ok((Meta::Comment(String::from(" SECRET")), ""))
+        meta().easy_parse("# ENCRYPT"),
+        Ok((Meta::Comment(String::from(" ENCRYPT")), ""))
     );
 }
 
@@ -153,12 +154,16 @@ fn it_line() {
         Ok((Line::Env(Env::new("KEY", "VALUE")), ""))
     );
     assert_eq!(
-        line().easy_parse("#%SECRET"),
-        Ok((Line::Meta(Meta::Secret), ""))
+        line().easy_parse("#%ENCRYPT"),
+        Ok((Line::Meta(Meta::Encrypt), ""))
     );
     assert_eq!(
-        line().easy_parse("# SECRET"),
-        Ok((Line::Meta(Meta::Comment(String::from(" SECRET"))), ""))
+        line().easy_parse("#%SECRET"),
+        Ok((Line::Meta(Meta::Comment(String::from("%SECRET"))), ""))
+    );
+    assert_eq!(
+        line().easy_parse("# ENCRYPT"),
+        Ok((Line::Meta(Meta::Comment(String::from(" ENCRYPT"))), ""))
     );
 }
 

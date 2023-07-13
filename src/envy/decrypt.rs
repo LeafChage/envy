@@ -6,24 +6,25 @@ pub fn action(path: &PathBuf, key: &str) -> Result<(), anyhow::Error> {
     let encrypter = crypt::EnvEncrypt::init(key)?;
     let lines = super::env::parser(path)?;
 
-    let mut next_is_enc = false;
+    let mut next_is_dec = false;
     for line in lines.into_iter() {
         match line {
-            Line::Meta(Meta::Secret) => {
-                next_is_enc = true;
-                println!("{}", line.to_string());
+            Line::Meta(Meta::Encrypt) => return Err(anyhow::Error::msg("unexpected ENCRYPT meta")),
+            Line::Meta(Meta::Encrypted) => {
+                next_is_dec = true;
+                println!("{}", Meta::Encrypt.to_string());
             }
             Line::Meta(Meta::Comment(_)) => {
-                next_is_enc = false;
+                next_is_dec = false;
                 println!("{}", line.to_string());
             }
             Line::Env(ref env) => {
-                if next_is_enc {
+                if next_is_dec {
                     println!("{}", encrypter.decrypt(env)?.to_string());
                 } else {
                     println!("{}", line.to_string());
                 }
-                next_is_enc = false;
+                next_is_dec = false;
             }
         }
     }
