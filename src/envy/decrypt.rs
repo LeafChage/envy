@@ -1,33 +1,44 @@
 use super::crypt;
+use super::crypt::base64;
 use super::env::{Line, Meta};
 use std::path::PathBuf;
 
 pub fn action(path: &PathBuf, key: &str) -> Result<(), anyhow::Error> {
-    let encrypter = crypt::EnvEncrypt::init(key)?;
+    let key = base64::decode(key)?;
+    let encrypter = crypt::EnvEncrypt::init(&key[..])?;
     let lines = super::env::parser(path)?;
 
-    let mut next_is_dec = false;
-    for line in lines.into_iter() {
+    let mut result = vec![];
+    let mut lines = lines.into_iter();
+    while let Some(line) = lines.next() {
         match line {
-            Line::Meta(Meta::Encrypt) => return Err(anyhow::Error::msg("unexpected ENCRYPT meta")),
             Line::Meta(Meta::Encrypted) => {
-                next_is_dec = true;
-                println!("{}", Meta::Encrypt.to_string());
-            }
-            Line::Meta(Meta::Comment(_)) => {
-                next_is_dec = false;
-                println!("{}", line.to_string());
-            }
-            Line::Env(ref env) => {
-                if next_is_dec {
-                    println!("{}", encrypter.decrypt(env)?.to_string());
-                } else {
-                    println!("{}", line.to_string());
+                result.push(Line::Meta(Meta::Encrypt));
+
+                match lines.next() {
+                    Some(Line::Env(ref env)) => {
+                        result.push(Line::Env(encrypter.decrypt(env).map_err(|e| {
+                            anyhow::Error::msg(format!("decrypt error: {}", e.to_string()))
+                        })?));
+                    }
+                    _ => return Err(anyhow::Error::msg("expect Env")),
                 }
-                next_is_dec = false;
             }
+            Line::Meta(Meta::Comment(_)) | Line::Env(_) => {
+                result.push(line);
+            }
+            Line::Meta(Meta::Encrypt) => return Err(anyhow::Error::msg("unexpected ENCRYPT meta")),
         }
     }
+
+    println!(
+        "{}",
+        result
+            .iter()
+            .map(|line| line.to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 
     Ok(())
 }

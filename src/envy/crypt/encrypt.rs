@@ -11,9 +11,8 @@ pub struct EnvEncrypt {
 }
 
 impl EnvEncrypt {
-    pub fn init(key: &str) -> Result<Self, anyhow::Error> {
-        let key = base64::decode(key)?;
-        let key: [u8; 32] = key[..].try_into()?;
+    pub fn init(key: &[u8]) -> Result<Self, anyhow::Error> {
+        let key: [u8; 32] = key.try_into()?;
         let key = Key::<Aes256Gcm>::from_slice(&key);
 
         let cipher = Aes256Gcm::new(&key);
@@ -47,6 +46,7 @@ impl EnvEncrypt {
 
 #[cfg(test)]
 mod tests {
+    use super::super::base64;
     use super::super::key::gen_key;
     use super::*;
     use crate::envy::env::Env;
@@ -54,7 +54,8 @@ mod tests {
     #[test]
     fn it_enc() {
         let key = gen_key();
-        let e = EnvEncrypt::init(&key).unwrap();
+        let key = base64::decode(&key).unwrap();
+        let e = EnvEncrypt::init(&key[..]).unwrap();
         let env = e.encrypt(&Env::new("key", "value")).unwrap();
         let env = e.decrypt(&env).unwrap();
         assert_eq!(env, Env::new("key", "value"));

@@ -99,7 +99,7 @@ parser! {
 parser! {
     fn meta_encrypted[I]()(I) -> Meta where [ I: Stream<Token = char> ]
     {
-        attempt(string("%ENCRYPT")).map(|_| Meta::Encrypted)
+        attempt(string("%ENCRYPTED")).map(|_| Meta::Encrypted)
     }
 }
 
@@ -117,8 +117,8 @@ parser! {
         ]
     {
         comment().and(choice((
-                    meta_encrypt(),
                     meta_encrypted(),
+                    meta_encrypt(),
                     meta_comment()
                     ))).skip(eof()).map(|(_, meta)| meta)
     }
@@ -127,6 +127,7 @@ parser! {
 fn it_meta() {
     assert_eq!(meta().easy_parse("#%ENCRYPT"), Ok((Meta::Encrypt, "")));
     assert!(meta().easy_parse("#%ENCRYPT_").is_err());
+    assert_eq!(meta().easy_parse("#%ENCRYPTED"), Ok((Meta::Encrypted, "")));
     assert_eq!(
         meta().easy_parse("# ENCRYPT"),
         Ok((Meta::Comment(String::from(" ENCRYPT")), ""))
@@ -170,11 +171,12 @@ fn it_line() {
 pub fn parser<P: AsRef<Path>>(path: P) -> Result<Vec<Line>, anyhow::Error> {
     let mut result = vec![];
     for v in BufReader::new(File::open(path)?).lines() {
-        if let Ok(ref v) = v {
-            if let Ok(v) = line().easy_parse(v as &str).map(|v| v.0) {
-                result.push(v);
-            }
-        }
+        let ref v = v.map_err(|_| anyhow::Error::msg("Unexpected"))?;
+        let token = line()
+            .easy_parse(v as &str)
+            .map(|v| v.0)
+            .map_err(|_| anyhow::Error::msg(format!("parse error: {}", v)))?;
+        result.push(token);
     }
     Ok(result)
 }
