@@ -4,6 +4,7 @@ simple env tools
 ## install
 ### from cargo
 ```
+cargo install env-y
 ```
 
 ### from dockerhub
