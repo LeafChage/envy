@@ -1,16 +1,18 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Meta {
     Encrypt,
-    Encrypted,
+    Encrypted(String),
     Comment(String),
+    WhiteSpaces,
 }
 
 impl ToString for Meta {
     fn to_string(&self) -> String {
         match self {
             Meta::Encrypt => String::from("#%ENCRYPT"),
-            Meta::Encrypted => String::from("#%ENCRYPTED"),
+            Meta::Encrypted(v) => String::from(format!("#%ENCRYPTED({})", v)),
             Meta::Comment(v) => String::from(format!("#{}", v)),
+            Meta::WhiteSpaces => String::from(""),
         }
     }
 }

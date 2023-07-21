@@ -99,7 +99,13 @@ parser! {
 parser! {
     fn meta_encrypted[I]()(I) -> Meta where [ I: Stream<Token = char> ]
     {
-        attempt(string("%ENCRYPTED")).map(|_| Meta::Encrypted)
+        attempt(
+            string("%ENCRYPTED")
+        ).with(
+            token('(')
+            .with(take_until::<Vec<char>, _, _>(token(')')))
+            .skip(token(')'))
+        ).map(|values| Meta::Encrypted(values.into_iter().fold(String::new(), |sum, next| sum + &next.to_string())))
     }
 }
 
@@ -111,23 +117,37 @@ parser! {
 }
 
 parser! {
+    fn meta_whitespaces[I]()(I) -> Meta where [ I: Stream<Token = char> ]
+    {
+        spaces().with(eof()).map(|_| Meta::WhiteSpaces)
+    }
+}
+
+parser! {
     fn meta[I]()(I) -> Meta
         where [
             I: Stream<Token = char>
         ]
     {
-        comment().and(choice((
-                    meta_encrypted(),
-                    meta_encrypt(),
-                    meta_comment()
-                    ))).skip(eof()).map(|(_, meta)| meta)
+        choice((
+            meta_whitespaces(),
+            comment().and(choice((
+                        meta_encrypted(),
+                        meta_encrypt(),
+                        meta_comment(),
+                        ))).map(|(_, meta)| meta)
+       )).skip(eof())
     }
 }
 #[test]
 fn it_meta() {
     assert_eq!(meta().easy_parse("#%ENCRYPT"), Ok((Meta::Encrypt, "")));
     assert!(meta().easy_parse("#%ENCRYPT_").is_err());
-    assert_eq!(meta().easy_parse("#%ENCRYPTED"), Ok((Meta::Encrypted, "")));
+    assert_eq!(
+        meta().easy_parse("#%ENCRYPTED(helloworld)"),
+        Ok((Meta::Encrypted(String::from("helloworld")), ""))
+    );
+    assert_eq!(meta().easy_parse("   "), Ok((Meta::WhiteSpaces, "")));
     assert_eq!(
         meta().easy_parse("# ENCRYPT"),
         Ok((Meta::Comment(String::from(" ENCRYPT")), ""))

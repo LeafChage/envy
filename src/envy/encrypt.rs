@@ -12,21 +12,20 @@ pub fn action(path: &PathBuf, key: &str) -> Result<(), anyhow::Error> {
     let mut lines = lines.into_iter();
     while let Some(line) = lines.next() {
         match line {
-            Line::Meta(Meta::Encrypt) => {
-                result.push(Line::Meta(Meta::Encrypted));
-
-                match lines.next() {
-                    Some(Line::Env(ref env)) => {
-                        result.push(Line::Env(encrypter.encrypt(env)?));
-                    }
-                    _ => return Err(anyhow::Error::msg("expect Env")),
+            Line::Meta(Meta::Encrypt) => match lines.next() {
+                Some(Line::Env(ref env)) => {
+                    let (env, nonce) = encrypter.encrypt(env)?;
+                    let nonce = base64::encode(&nonce);
+                    result.push(Line::Meta(Meta::Encrypted(String::from(nonce))));
+                    result.push(Line::Env(env));
                 }
-            }
-            Line::Meta(Meta::Comment(_)) | Line::Env(_) => {
+                _ => return Err(anyhow::Error::msg("expect Env")),
+            },
+            Line::Meta(Meta::Comment(_))
+            | Line::Meta(Meta::Encrypted(_))
+            | Line::Env(_)
+            | Line::Meta(Meta::WhiteSpaces) => {
                 result.push(line);
-            }
-            Line::Meta(Meta::Encrypted) => {
-                return Err(anyhow::Error::msg("unexpected ENCRYPTED meta"))
             }
         }
     }

@@ -1,6 +1,7 @@
 use super::crypt;
 use super::crypt::base64;
 use super::env::{Line, Meta};
+use aes_gcm::{aead::Nonce, Aes256Gcm};
 use std::path::PathBuf;
 
 pub fn action(path: &PathBuf, key: &str) -> Result<(), anyhow::Error> {
@@ -12,22 +13,25 @@ pub fn action(path: &PathBuf, key: &str) -> Result<(), anyhow::Error> {
     let mut lines = lines.into_iter();
     while let Some(line) = lines.next() {
         match line {
-            Line::Meta(Meta::Encrypted) => {
-                result.push(Line::Meta(Meta::Encrypt));
+            Line::Meta(Meta::Encrypted(nonce)) => match lines.next() {
+                Some(Line::Env(ref env)) => {
+                    let nonce = base64::decode(&nonce)?;
+                    let nonce = Nonce::<Aes256Gcm>::from_slice(&nonce);
 
-                match lines.next() {
-                    Some(Line::Env(ref env)) => {
-                        result.push(Line::Env(encrypter.decrypt(env).map_err(|e| {
-                            anyhow::Error::msg(format!("decrypt error: {}", e.to_string()))
-                        })?));
-                    }
-                    _ => return Err(anyhow::Error::msg("expect Env")),
+                    let env = encrypter.decrypt(env, nonce).map_err(|e| {
+                        anyhow::Error::msg(format!("decrypt error: {}", e.to_string()))
+                    })?;
+                    result.push(Line::Meta(Meta::Encrypt));
+                    result.push(Line::Env(env));
                 }
-            }
-            Line::Meta(Meta::Comment(_)) | Line::Env(_) => {
+                _ => return Err(anyhow::Error::msg("expect Env")),
+            },
+            Line::Meta(Meta::Comment(_))
+            | Line::Env(_)
+            | Line::Meta(Meta::Encrypt)
+            | Line::Meta(Meta::WhiteSpaces) => {
                 result.push(line);
             }
-            Line::Meta(Meta::Encrypt) => return Err(anyhow::Error::msg("unexpected ENCRYPT meta")),
         }
     }
 

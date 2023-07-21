@@ -12,11 +12,8 @@ pub fn action(path: &PathBuf, cmd: &Vec<String>) -> Result<(), anyhow::Error> {
     }
 
     let bin = cmd.first().unwrap();
-    Command::new(bin)
-        .args(cmd[1..].iter())
-        .envs(envs)
-        .spawn()
-        .expect("failed to spawn child process");
+    let mut p = Command::new(bin).args(cmd[1..].iter()).envs(envs).spawn()?;
+    p.wait()?;
 
     Ok(())
 }
