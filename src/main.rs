@@ -32,7 +32,7 @@ enum Commands {
         #[arg(short='f',num_args = 1.., value_delimiter = ' ', value_name="ENV_FILE")]
         input: Vec<PathBuf>,
 
-        #[arg(long = "", allow_hyphen_values = true, num_args = 1.., value_delimiter = ' ', value_name="CMD|ARGS")]
+        #[arg(long = "cmd", allow_hyphen_values = true, num_args = 1.., value_delimiter = ' ', value_name="CMD|ARGS")]
         cmd: Vec<String>,
     },
     /// generate key
