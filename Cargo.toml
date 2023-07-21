@@ -1,5 +1,5 @@
 [package]
-name = "envy"
+name = "env-y"
 description= "simple env tools"
 version = "0.1.0"
 edition = "2021"
@@ -7,8 +7,9 @@ authors = ["LeafChage <https://github.com/LeafChage>"]
 license-file = "LICENSE"
 exclude = [ "bin", "Dockerfile"]
 
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "envy"
+path = "src/main.rs"
 
 [dependencies]
 aes-gcm = "0.10.2"
