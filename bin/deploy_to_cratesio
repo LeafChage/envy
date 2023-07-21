@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -euxo pipefail
+
+test -n "$CARGO_REGISTRY_TOKEN"
+cargo publish
